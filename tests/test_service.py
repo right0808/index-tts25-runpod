@@ -20,11 +20,11 @@ def make_wav():
 
 
 class FakeResponse:
-    status_code = 200
     text = ""
 
-    def __init__(self, content):
+    def __init__(self, content=b"", status_code=200):
         self.content = content
+        self.status_code = status_code
         self.closed = False
 
     def close(self):
@@ -35,9 +35,18 @@ class FakeResponse:
 
 
 class FakeSession:
-    def __init__(self, audio):
+    def __init__(self, audio, health_statuses=None):
         self.audio = audio
         self.json = None
+        self.health_statuses = list(health_statuses or [200])
+        self.health_checks = 0
+
+    def get(self, url, **kwargs):
+        assert url.endswith("/health")
+        assert kwargs["timeout"] == 5
+        self.health_checks += 1
+        status = self.health_statuses.pop(0) if self.health_statuses else 200
+        return FakeResponse(status_code=status)
 
     def post(self, url, **kwargs):
         assert url.endswith("/v1/audio/speech")
@@ -114,3 +123,20 @@ def test_synthesis_maps_request_and_returns_oss_url(monkeypatch, settings):
     assert result["sample_rate"] == 22050
     assert result["channels"] == 1
     assert fake_oss.data.startswith(b"RIFF")
+
+
+def test_synthesis_waits_for_model_server(monkeypatch, settings):
+    session = FakeSession(make_wav(), health_statuses=[503, 200])
+    service = TTSService(settings, session=session)
+    service.oss = FakeOss()
+
+    monkeypatch.setattr("worker.service.time.sleep", lambda _: None)
+    monkeypatch.setattr(
+        "worker.service.resolve_audio",
+        lambda value, **kwargs: ResolvedAudio("data:audio/mp4;base64,AAAA", 4, "audio/mp4", "audio.example"),
+    )
+
+    service.synthesize(
+        {"id": "job-wait", "input": {"text": "测试", "speaker_audio": "https://audio.example/speaker.m4a"}}
+    )
+    assert session.health_checks == 2

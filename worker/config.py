@@ -34,6 +34,7 @@ class Settings:
     oss_http_timeout: int = 30
     model_id: str = "IndexTeam/IndexTTS-2.5"
     vllm_base_url: str = "http://127.0.0.1:8092"
+    vllm_startup_timeout: int = 1800
     vllm_request_timeout: int = 1800
     max_text_chars: int = 3000
     max_reference_audio_bytes: int = 25 * 1024 * 1024
@@ -48,9 +49,9 @@ class Settings:
             oss_http_timeout=_positive_int("OSS_HTTP_TIMEOUT", 30),
             model_id=os.getenv("MODEL_ID", "IndexTeam/IndexTTS-2.5").strip(),
             vllm_base_url=os.getenv("VLLM_BASE_URL", "http://127.0.0.1:8092").rstrip("/"),
+            vllm_startup_timeout=_positive_int("VLLM_STARTUP_TIMEOUT", 1800),
             vllm_request_timeout=_positive_int("VLLM_REQUEST_TIMEOUT", 1800),
             max_text_chars=_positive_int("MAX_TEXT_CHARS", 3000),
             max_reference_audio_bytes=_positive_int("MAX_REFERENCE_AUDIO_BYTES", 25 * 1024 * 1024),
             max_output_audio_bytes=_positive_int("MAX_OUTPUT_AUDIO_BYTES", 100 * 1024 * 1024),
         )
-

@@ -72,6 +72,7 @@ OSS_UPLOAD_API_KEY={{ RUNPOD_SECRET_OSS_UPLOAD_API_KEY }}
 OSS_EXPIRES_SECONDS=3600
 OSS_HTTP_TIMEOUT=30
 MODEL_ID=IndexTeam/IndexTTS-2.5
+VLLM_STARTUP_TIMEOUT=1800
 VLLM_REQUEST_TIMEOUT=1800
 ```
 
@@ -111,4 +112,3 @@ python scripts/live_test.py \
   not include API keys, audio payloads, or full request bodies.
 - Use only voices for which you have consent and comply with the official
   [Bilibili IndexTTS model license](https://github.com/index-tts/index-tts/blob/main/LICENSE).
-

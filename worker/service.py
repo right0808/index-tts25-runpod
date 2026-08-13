@@ -72,6 +72,34 @@ class TTSService:
             session=self.session,
         )
 
+    def _wait_for_vllm(self, *, task_id: str) -> None:
+        health_url = f"{self.settings.vllm_base_url}/health"
+        deadline = time.monotonic() + self.settings.vllm_startup_timeout
+        LOGGER.info(
+            "stage=model_server_wait task_id=%s timeout_seconds=%d",
+            task_id,
+            self.settings.vllm_startup_timeout,
+        )
+        while True:
+            response = None
+            try:
+                response = self.session.get(health_url, timeout=5)
+                if response.status_code == 200:
+                    LOGGER.info("stage=model_server_ready task_id=%s", task_id)
+                    return
+            except requests.RequestException:
+                pass
+            finally:
+                if response is not None:
+                    response.close()
+
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise InferenceError(
+                    f"vLLM-Omni did not become ready within {self.settings.vllm_startup_timeout} seconds"
+                )
+            time.sleep(min(5, remaining))
+
     def _validate_input(self, job: dict[str, Any]) -> dict[str, Any]:
         payload = job.get("input")
         if not isinstance(payload, dict):
@@ -146,6 +174,8 @@ class TTSService:
             values["language"],
             "text" if values["emotion_text"] else "vector" if values["emotion_vector"] else "audio" if values["emotion_audio"] else "speaker",
         )
+
+        self._wait_for_vllm(task_id=task_id)
 
         try:
             speaker = resolve_audio(

@@ -3,7 +3,6 @@ set -Eeuo pipefail
 
 MODEL_ID="${MODEL_ID:-IndexTeam/IndexTTS-2.5}"
 VLLM_PORT="${VLLM_PORT:-8092}"
-VLLM_STARTUP_TIMEOUT="${VLLM_STARTUP_TIMEOUT:-1800}"
 DEPLOY_CONFIG="${DEPLOY_CONFIG:-/app/deploy/indextts2_5_serverless.yaml}"
 
 server_pid=""
@@ -29,22 +28,23 @@ FLASHINFER_DISABLE_VERSION_CHECK=1 vllm serve "${MODEL_ID}" \
   --deploy-config "${DEPLOY_CONFIG}" &
 server_pid=$!
 
-deadline=$((SECONDS + VLLM_STARTUP_TIMEOUT))
-until curl --silent --show-error --fail "http://127.0.0.1:${VLLM_PORT}/health" >/dev/null; do
-  if ! kill -0 "${server_pid}" 2>/dev/null; then
-    wait "${server_pid}" || true
-    echo "stage=model_server_failed reason=process_exited" >&2
-    exit 1
-  fi
-  if (( SECONDS >= deadline )); then
-    echo "stage=model_server_failed reason=startup_timeout timeout_seconds=${VLLM_STARTUP_TIMEOUT}" >&2
-    exit 1
-  fi
+# Register with the RunPod queue immediately. Model readiness is awaited by the
+# handler after it receives a job so RunPod does not recycle an unregistered
+# worker while a large model is still loading.
+echo "stage=handler_start"
+python3 -u /app/handler.py &
+handler_pid=$!
+
+while kill -0 "${server_pid}" 2>/dev/null && kill -0 "${handler_pid}" 2>/dev/null; do
   sleep 5
 done
 
-echo "stage=model_server_ready"
-python3 -u /app/handler.py &
-handler_pid=$!
-wait "${handler_pid}"
-
+exit_code=0
+if ! kill -0 "${server_pid}" 2>/dev/null; then
+  wait "${server_pid}" || exit_code=$?
+  echo "stage=model_server_failed reason=process_exited exit_code=${exit_code}" >&2
+else
+  wait "${handler_pid}" || exit_code=$?
+  echo "stage=handler_failed reason=process_exited exit_code=${exit_code}" >&2
+fi
+exit "${exit_code}"
