@@ -36,6 +36,7 @@ class Settings:
     vllm_base_url: str = "http://127.0.0.1:8092"
     vllm_startup_timeout: int = 1800
     vllm_request_timeout: int = 1800
+    vllm_failure_file: str = "/tmp/vllm-server.failed"
     max_text_chars: int = 3000
     max_reference_audio_bytes: int = 25 * 1024 * 1024
     max_output_audio_bytes: int = 100 * 1024 * 1024
@@ -51,6 +52,7 @@ class Settings:
             vllm_base_url=os.getenv("VLLM_BASE_URL", "http://127.0.0.1:8092").rstrip("/"),
             vllm_startup_timeout=_positive_int("VLLM_STARTUP_TIMEOUT", 1800),
             vllm_request_timeout=_positive_int("VLLM_REQUEST_TIMEOUT", 1800),
+            vllm_failure_file=os.getenv("VLLM_FAILURE_FILE", "/tmp/vllm-server.failed").strip(),
             max_text_chars=_positive_int("MAX_TEXT_CHARS", 3000),
             max_reference_audio_bytes=_positive_int("MAX_REFERENCE_AUDIO_BYTES", 25 * 1024 * 1024),
             max_output_audio_bytes=_positive_int("MAX_OUTPUT_AUDIO_BYTES", 100 * 1024 * 1024),

@@ -7,6 +7,7 @@ import re
 import time
 import wave
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import requests
@@ -75,12 +76,20 @@ class TTSService:
     def _wait_for_vllm(self, *, task_id: str) -> None:
         health_url = f"{self.settings.vllm_base_url}/health"
         deadline = time.monotonic() + self.settings.vllm_startup_timeout
+        failure_file = Path(self.settings.vllm_failure_file)
         LOGGER.info(
             "stage=model_server_wait task_id=%s timeout_seconds=%d",
             task_id,
             self.settings.vllm_startup_timeout,
         )
         while True:
+            if failure_file.is_file():
+                try:
+                    detail = failure_file.read_text(encoding="utf-8", errors="replace")[-4000:].strip()
+                except OSError:
+                    detail = "startup process exited; diagnostic file could not be read"
+                raise InferenceError(f"vLLM-Omni startup failed: {detail}")
+
             response = None
             try:
                 response = self.session.get(health_url, timeout=5)

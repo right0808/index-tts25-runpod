@@ -1,3 +1,4 @@
+import dataclasses
 import io
 import wave
 
@@ -6,7 +7,7 @@ import pytest
 from worker.audio import ResolvedAudio
 from worker.config import Settings
 from worker.oss import OssObject
-from worker.service import InvalidJobInput, TTSService
+from worker.service import InferenceError, InvalidJobInput, TTSService
 
 
 def make_wav():
@@ -140,3 +141,13 @@ def test_synthesis_waits_for_model_server(monkeypatch, settings):
         {"id": "job-wait", "input": {"text": "测试", "speaker_audio": "https://audio.example/speaker.m4a"}}
     )
     assert session.health_checks == 2
+
+
+def test_reports_model_server_startup_failure(settings, tmp_path):
+    failure_file = tmp_path / "vllm.failed"
+    failure_file.write_text("exit_code=1\nCUDA out of memory", encoding="utf-8")
+    settings = dataclasses.replace(settings, vllm_failure_file=str(failure_file))
+    service = TTSService(settings, session=FakeSession(make_wav()))
+
+    with pytest.raises(InferenceError, match="CUDA out of memory"):
+        service._wait_for_vllm(task_id="task-failed-startup")
