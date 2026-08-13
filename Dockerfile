@@ -1,4 +1,4 @@
-ARG VLLM_BASE_IMAGE=vllm/vllm-openai:v0.26.0
+ARG VLLM_BASE_IMAGE=vllm/vllm-openai:v0.27.0
 FROM ${VLLM_BASE_IMAGE}
 
 ARG VLLM_OMNI_COMMIT=bbe6ccc512a404a2df8c977ea29003002f2683e8
@@ -21,7 +21,7 @@ RUN apt-get update \
 COPY requirements-worker.txt /tmp/requirements-worker.txt
 
 # vLLM-Omni changes rapidly. Pin the exact source revision that was inspected
-# with the matching vLLM 0.26 base image instead of following a moving branch.
+# with the matching vLLM 0.27 base image instead of following a moving branch.
 RUN uv pip install --python "$(command -v python3)" --no-cache-dir \
       "vllm-omni[indextts2] @ git+https://github.com/vllm-project/vllm-omni.git@${VLLM_OMNI_COMMIT}" \
     && uv pip install --python "$(command -v python3)" --no-cache-dir \
