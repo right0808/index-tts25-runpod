@@ -47,7 +47,7 @@ rm -f "${VLLM_FAILURE_FILE}"
   exit_code=${PIPESTATUS[0]}
   {
     printf 'exit_code=%d\n' "${exit_code}"
-    tail -n 80 "${VLLM_LOG_FILE}"
+    tail -n 400 "${VLLM_LOG_FILE}"
   } > "${VLLM_FAILURE_FILE}"
   echo "stage=model_server_failed reason=process_exited exit_code=${exit_code}" >&2
   exit "${exit_code}"
@@ -69,7 +69,7 @@ rm -f /tmp/lb-api.failed
   exit_code=${PIPESTATUS[0]}
   {
     printf 'exit_code=%d\n' "${exit_code}"
-    tail -n 80 /tmp/lb-api.log
+    tail -n 200 /tmp/lb-api.log
   } > /tmp/lb-api.failed
   echo "stage=load_balancer_failed reason=process_exited exit_code=${exit_code}" >&2
 ) &

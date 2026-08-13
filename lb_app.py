@@ -40,7 +40,7 @@ def _failure_detail() -> str | None:
     if not failure_file.is_file():
         return None
     try:
-        return failure_file.read_text(encoding="utf-8", errors="replace")[-4000:].strip()
+        return failure_file.read_text(encoding="utf-8", errors="replace")[-30000:].strip()
     except OSError:
         return "vLLM process exited; its diagnostic file could not be read"
 

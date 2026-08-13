@@ -11,7 +11,7 @@ def _tail(path: Path) -> str | None:
     if not path.is_file():
         return None
     try:
-        return path.read_text(encoding="utf-8", errors="replace")[-4000:].strip()
+        return path.read_text(encoding="utf-8", errors="replace")[-30000:].strip()
     except OSError:
         return f"could not read diagnostic file: {path}"
 
