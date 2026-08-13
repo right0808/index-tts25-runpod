@@ -5,7 +5,6 @@ import argparse
 import json
 import os
 import sys
-import time
 from pathlib import Path
 
 import requests
@@ -79,30 +78,21 @@ def main() -> int:
         payload["input"].pop("emotion_audio")
 
     response = requests.post(
-        f"https://api.runpod.ai/v2/{args.endpoint_id}/run",
+        f"https://{args.endpoint_id}.api.runpod.ai/tts",
         headers={"Authorization": f"Bearer {runpod_key}", "Content-Type": "application/json"},
-        json=payload,
-        timeout=30,
+        json=payload["input"],
+        timeout=args.timeout,
     )
     response.raise_for_status()
-    job_id = response.json()["id"]
-    print(json.dumps({"job_id": job_id}, ensure_ascii=False))
+    data = response.json()
+    print(json.dumps(data, ensure_ascii=False, indent=2))
 
-    deadline = time.monotonic() + args.timeout
-    while time.monotonic() < deadline:
-        status = requests.get(
-            f"https://api.runpod.ai/v2/{args.endpoint_id}/status/{job_id}",
-            headers={"Authorization": f"Bearer {runpod_key}"},
-            timeout=30,
-        )
-        status.raise_for_status()
-        data = status.json()
-        state = data.get("status")
-        if state in {"COMPLETED", "FAILED", "CANCELLED", "TIMED_OUT"}:
-            print(json.dumps(data, ensure_ascii=False, indent=2))
-            return 0 if state == "COMPLETED" and not data.get("output", {}).get("error") else 1
-        time.sleep(5)
-    raise TimeoutError(f"RunPod job did not finish within {args.timeout} seconds")
+    audio = requests.get(data["audio_url"], timeout=60)
+    audio.raise_for_status()
+    if audio.content[:4] != b"RIFF" or audio.content[8:12] != b"WAVE":
+        raise RuntimeError("Generated output is not a RIFF/WAVE file")
+    print(json.dumps({"audio_bytes": len(audio.content), "riff_wave": True}, ensure_ascii=False))
+    return 0
 
 
 if __name__ == "__main__":
@@ -111,4 +101,3 @@ if __name__ == "__main__":
     except Exception as exc:
         print(f"live test failed: {exc}", file=sys.stderr)
         raise
-

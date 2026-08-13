@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import http.client
 import json
+import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -19,6 +20,7 @@ def _tail(path: Path) -> str | None:
 class Handler(BaseHTTPRequestHandler):
     health_only = False
     upstream_port: int | None = None
+    upstream_timeout = float(os.getenv("LB_UPSTREAM_TIMEOUT", "1900"))
 
     def _write(self, status: int, payload: dict[str, object]) -> None:
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -39,7 +41,7 @@ class Handler(BaseHTTPRequestHandler):
         if content_type:
             headers["Content-Type"] = content_type
 
-        connection = http.client.HTTPConnection("127.0.0.1", self.upstream_port, timeout=2)
+        connection = http.client.HTTPConnection("127.0.0.1", self.upstream_port, timeout=self.upstream_timeout)
         try:
             connection.request(self.command, self.path, body=body, headers=headers)
             response = connection.getresponse()

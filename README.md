@@ -11,8 +11,8 @@ cold start it returns HTTP 503 with `MODEL_STARTING`; retry after the response's
 `failed` model states.
 
 The container listens on `PORT=8000` for user traffic and on the distinct
-`PORT_HEALTH=8001` for RunPod health probes. Configure the template HTTP port
-as `8000/http` and `HEALTH_CHECK_PATH=/ping`.
+`PORT_HEALTH=8001` for RunPod health probes. Configure the template HTTP ports
+as `8000/http,8001/http` and `HEALTH_CHECK_PATH=/ping`.
 
 Production-oriented Load Balancing worker for `IndexTeam/IndexTTS-2.5`. It runs the
 official vLLM-Omni two-stage backend inside the worker, validates and resolves
@@ -21,19 +21,17 @@ result to the configured OSS service, and returns a temporary public URL.
 
 ## API
 
-Submit an async RunPod request to `https://api.runpod.ai/v2/ENDPOINT_ID/run`:
+Submit a direct request to `https://ENDPOINT_ID.api.runpod.ai/tts`:
 
 ```json
 {
-  "input": {
-    "text": "大概两到三天就可以送到哈。",
-    "language": "zh",
-    "speaker_audio": "https://example.com/speaker.m4a",
-    "emotion_audio": "https://example.com/emotion.m4a",
-    "emotion_alpha": 0.8,
-    "speed": 1.0,
-    "text_normalization": true
-  }
+  "text": "大概两到三天就可以送到哈。",
+  "language": "zh",
+  "speaker_audio": "https://example.com/speaker.m4a",
+  "emotion_audio": "https://example.com/emotion.m4a",
+  "emotion_alpha": 0.8,
+  "speed": 1.0,
+  "text_normalization": true
 }
 ```
 
@@ -64,20 +62,21 @@ Successful output:
 }
 ```
 
-Input errors return `output.error` with `retryable: false`. Infrastructure,
-inference, and OSS failures fail the RunPod job so operational retries and logs
-remain visible.
+Input errors return HTTP 422. Cold starts return HTTP 503 and busy workers
+return HTTP 429, both with a `Retry-After` header. Inference and OSS failures
+return HTTP 502 with a structured error body.
 
 ## RunPod deployment
 
 1. In RunPod Settings, connect GitHub and grant access to this repository.
 2. Create a Serverless endpoint and choose **Import Git Repository**.
-3. Select this repository, branch `main`, and `/Dockerfile`.
-4. Select **Queue** endpoint type.
-5. Under Model, enter `IndexTeam/IndexTTS-2.5` to enable RunPod model caching.
-6. Start with a single 24 GB GPU priority such as RTX 4090, L4, or A5000.
-7. Use `workersMin=0`, `workersMax=1`, execution timeout `1800` seconds,
+3. Select this repository, branch `load-balancer`, and `/Dockerfile`.
+4. Select **Load Balancer** endpoint type.
+5. Start with a single 48 GB GPU such as A40 or RTX A6000. A 24 GB GPU can be
+   tested later after the deployment is stable.
+6. Use `workersMin=1`, `workersMax=1`, execution timeout `1800` seconds,
    container disk at least `64 GB`, CUDA `13.0`, and FlashBoot enabled.
+7. Configure the template HTTP ports as `8000/http,8001/http`.
 8. Create a RunPod Secret named `OSS_UPLOAD_API_KEY`, then configure:
 
 ```text
@@ -90,7 +89,7 @@ VLLM_STARTUP_TIMEOUT=1800
 VLLM_REQUEST_TIMEOUT=1800
 ```
 
-The Docker image uses `vllm/vllm-openai:v0.26.0` plus the inspected
+The Docker image uses `vllm/vllm-openai:v0.27.0` plus the inspected
 vLLM-Omni source commit `bbe6ccc512a404a2df8c977ea29003002f2683e8`.
 The deploy config follows the official IndexTTS 2.5 two-stage recipe but uses
 one sequence at a time and disables S2Mel torch compilation for a safer first

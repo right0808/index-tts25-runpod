@@ -7,6 +7,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from lb_fallback import Handler
 
 
+def test_gateway_timeout_allows_long_tts_requests():
+    assert Handler.upstream_timeout >= 1800
+
+
 class UpstreamHandler(BaseHTTPRequestHandler):
     def do_GET(self):  # noqa: N802
         body = json.dumps({"status": "ready"}).encode()
