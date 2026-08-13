@@ -53,16 +53,30 @@ server_pid=$!
 # RunPod from recycling the worker during a long IndexTTS cold start. /tts and
 # /ready still reject traffic until the local vLLM server reports ready.
 echo "stage=load_balancer_start port=${PORT}"
-python3 -m uvicorn lb_app:app --host 0.0.0.0 --port "${PORT}" &
+(
+  set +e
+  python3 -m uvicorn lb_app:app --host 0.0.0.0 --port "${PORT}" 2>&1 | tee /tmp/lb-api.log
+  exit_code=${PIPESTATUS[0]}
+  {
+    printf 'exit_code=%d\n' "${exit_code}"
+    tail -n 80 /tmp/lb-api.log
+  } > /tmp/lb-api.failed
+  echo "stage=load_balancer_failed reason=process_exited exit_code=${exit_code}" >&2
+  exec python3 /app/lb_fallback.py --port "${PORT}"
+) &
 api_pid=$!
 
 if [[ "${PORT_HEALTH}" != "${PORT}" ]]; then
   echo "stage=health_server_start port=${PORT_HEALTH}"
-  python3 -m uvicorn lb_app:app --host 0.0.0.0 --port "${PORT_HEALTH}" --log-level warning &
+  python3 /app/lb_fallback.py --port "${PORT_HEALTH}" --health-only &
   health_pid=$!
 fi
 
 exit_code=0
-wait "${api_pid}" || exit_code=$?
-echo "stage=load_balancer_failed reason=process_exited exit_code=${exit_code}" >&2
+if [[ -n "${health_pid}" ]]; then
+  wait "${health_pid}" || exit_code=$?
+  echo "stage=health_server_failed reason=process_exited exit_code=${exit_code}" >&2
+else
+  wait "${api_pid}" || exit_code=$?
+fi
 exit "${exit_code}"

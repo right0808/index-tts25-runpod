@@ -66,8 +66,12 @@ class FakeOss:
 
 
 @pytest.fixture
-def settings():
-    return Settings(oss_base_url="http://oss.example", oss_upload_api_key="secret")
+def settings(tmp_path):
+    return Settings(
+        oss_base_url="http://oss.example",
+        oss_upload_api_key="secret",
+        vllm_failure_file=str(tmp_path / "vllm-server.failed"),
+    )
 
 
 def test_rejects_multiple_emotion_modes(settings):
