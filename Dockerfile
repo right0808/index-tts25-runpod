@@ -30,10 +30,10 @@ RUN uv pip install --python "$(command -v python3)" --no-cache-dir \
 WORKDIR /app
 COPY deploy /app/deploy
 COPY worker /app/worker
-COPY handler.py start.sh /app/
+COPY handler.py lb_app.py start.sh start-lb.sh /app/
 
-RUN chmod 0755 /app/start.sh \
-    && python3 -m compileall -q /app/handler.py /app/worker
+RUN chmod 0755 /app/start.sh /app/start-lb.sh \
+    && python3 -m compileall -q /app/handler.py /app/lb_app.py /app/worker
 
 ENTRYPOINT []
-CMD ["/app/start.sh"]
+CMD ["/app/start-lb.sh"]

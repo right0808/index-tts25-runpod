@@ -1,6 +1,16 @@
 # IndexTTS 2.5 on RunPod Serverless
 
-Production-oriented Queue worker for `IndexTeam/IndexTTS-2.5`. It runs the
+This branch targets a RunPod **Load Balancing** endpoint. It exposes a direct
+HTTP API at `https://ENDPOINT_ID.api.runpod.ai/tts` and a liveness check at
+`/ping`. The `main` branch retains the Queue worker contract.
+
+The `/tts` body can be either the direct synthesis object shown below or the
+same object nested under `input` for compatibility with Queue clients. During
+cold start it returns HTTP 503 with `MODEL_STARTING`; retry after the response's
+`Retry-After` interval. `/ready` distinguishes `starting`, `ready`, and
+`failed` model states.
+
+Production-oriented Load Balancing worker for `IndexTeam/IndexTTS-2.5`. It runs the
 official vLLM-Omni two-stage backend inside the worker, validates and resolves
 speaker/emotion reference audio, synthesizes 22.05 kHz mono WAV, uploads the
 result to the configured OSS service, and returns a temporary public URL.
