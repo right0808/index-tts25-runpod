@@ -3,7 +3,8 @@ set -Eeuo pipefail
 
 MODEL_ID="${MODEL_ID:-IndexTeam/IndexTTS-2.5}"
 VLLM_PORT="${VLLM_PORT:-8092}"
-PORT="${PORT:-80}"
+PORT="${PORT:-8000}"
+PORT_HEALTH="${PORT_HEALTH:-8001}"
 DEPLOY_CONFIG="${DEPLOY_CONFIG:-/app/deploy/indextts2_5_serverless.yaml}"
 VLLM_LOG_FILE="${VLLM_LOG_FILE:-/tmp/vllm-server.log}"
 VLLM_FAILURE_FILE="${VLLM_FAILURE_FILE:-/tmp/vllm-server.failed}"
@@ -11,10 +12,14 @@ export VLLM_FAILURE_FILE
 
 server_pid=""
 api_pid=""
+health_pid=""
 
 cleanup() {
   if [[ -n "${api_pid}" ]]; then
     kill -TERM "${api_pid}" 2>/dev/null || true
+  fi
+  if [[ -n "${health_pid}" ]]; then
+    kill -TERM "${health_pid}" 2>/dev/null || true
   fi
   if [[ -n "${server_pid}" ]]; then
     kill -TERM "${server_pid}" 2>/dev/null || true
@@ -50,6 +55,12 @@ server_pid=$!
 echo "stage=load_balancer_start port=${PORT}"
 python3 -m uvicorn lb_app:app --host 0.0.0.0 --port "${PORT}" &
 api_pid=$!
+
+if [[ "${PORT_HEALTH}" != "${PORT}" ]]; then
+  echo "stage=health_server_start port=${PORT_HEALTH}"
+  python3 -m uvicorn lb_app:app --host 0.0.0.0 --port "${PORT_HEALTH}" --log-level warning &
+  health_pid=$!
+fi
 
 exit_code=0
 wait "${api_pid}" || exit_code=$?

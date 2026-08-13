@@ -10,6 +10,10 @@ cold start it returns HTTP 503 with `MODEL_STARTING`; retry after the response's
 `Retry-After` interval. `/ready` distinguishes `starting`, `ready`, and
 `failed` model states.
 
+The container listens on `PORT=8000` for user traffic and on the distinct
+`PORT_HEALTH=8001` for RunPod health probes. Configure the template HTTP port
+as `8000/http` and `HEALTH_CHECK_PATH=/ping`.
+
 Production-oriented Load Balancing worker for `IndexTeam/IndexTTS-2.5`. It runs the
 official vLLM-Omni two-stage backend inside the worker, validates and resolves
 speaker/emotion reference audio, synthesizes 22.05 kHz mono WAV, uploads the
