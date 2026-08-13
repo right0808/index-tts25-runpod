@@ -5,6 +5,7 @@ MODEL_ID="${MODEL_ID:-IndexTeam/IndexTTS-2.5}"
 VLLM_PORT="${VLLM_PORT:-8092}"
 PORT="${PORT:-8000}"
 PORT_HEALTH="${PORT_HEALTH:-8001}"
+LB_INTERNAL_PORT="${LB_INTERNAL_PORT:-8002}"
 DEPLOY_CONFIG="${DEPLOY_CONFIG:-/app/deploy/indextts2_5_serverless.yaml}"
 VLLM_LOG_FILE="${VLLM_LOG_FILE:-/tmp/vllm-server.log}"
 VLLM_FAILURE_FILE="${VLLM_FAILURE_FILE:-/tmp/vllm-server.failed}"
@@ -12,11 +13,15 @@ export VLLM_FAILURE_FILE
 
 server_pid=""
 api_pid=""
+app_pid=""
 health_pid=""
 
 cleanup() {
   if [[ -n "${api_pid}" ]]; then
     kill -TERM "${api_pid}" 2>/dev/null || true
+  fi
+  if [[ -n "${app_pid}" ]]; then
+    kill -TERM "${app_pid}" 2>/dev/null || true
   fi
   if [[ -n "${health_pid}" ]]; then
     kill -TERM "${health_pid}" 2>/dev/null || true
@@ -52,19 +57,23 @@ server_pid=$!
 # The liveness endpoint intentionally starts before model readiness. This keeps
 # RunPod from recycling the worker during a long IndexTTS cold start. /tts and
 # /ready still reject traffic until the local vLLM server reports ready.
-echo "stage=load_balancer_start port=${PORT}"
+echo "stage=load_balancer_gateway_start port=${PORT} upstream_port=${LB_INTERNAL_PORT}"
+python3 /app/lb_fallback.py --port "${PORT}" --upstream-port "${LB_INTERNAL_PORT}" &
+api_pid=$!
+
+echo "stage=load_balancer_app_start port=${LB_INTERNAL_PORT}"
+rm -f /tmp/lb-api.failed
 (
   set +e
-  python3 -m uvicorn lb_app:app --host 0.0.0.0 --port "${PORT}" 2>&1 | tee /tmp/lb-api.log
+  python3 -m uvicorn lb_app:app --host 127.0.0.1 --port "${LB_INTERNAL_PORT}" 2>&1 | tee /tmp/lb-api.log
   exit_code=${PIPESTATUS[0]}
   {
     printf 'exit_code=%d\n' "${exit_code}"
     tail -n 80 /tmp/lb-api.log
   } > /tmp/lb-api.failed
   echo "stage=load_balancer_failed reason=process_exited exit_code=${exit_code}" >&2
-  exec python3 /app/lb_fallback.py --port "${PORT}"
 ) &
-api_pid=$!
+app_pid=$!
 
 if [[ "${PORT_HEALTH}" != "${PORT}" ]]; then
   echo "stage=health_server_start port=${PORT_HEALTH}"
