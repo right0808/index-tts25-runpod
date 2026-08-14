@@ -1,5 +1,8 @@
 # IndexTTS 2.5 on RunPod Serverless
 
+中文完整部署、配置、API 和测试说明见
+[《IndexTTS 2.5 RunPod Load Balancing 部署与测试指南》](docs/部署与测试指南.md)。
+
 This branch targets a RunPod **Load Balancing** endpoint. It exposes a direct
 HTTP API at `https://ENDPOINT_ID.api.runpod.ai/tts` and a liveness check at
 `/ping`. The `main` branch retains the Queue worker contract.
