@@ -114,6 +114,14 @@ After the endpoint is ready, run a real test without committing credentials or
 audio files:
 
 ```bash
+python test_api.py
+```
+
+The root-level test uses the currently deployed endpoint, `../.env`,
+`../fxd.m4a`, `../emotion1.m4a`, and the verified Chinese test text by default.
+Every value can be overridden with the options shown below.
+
+```bash
 python scripts/test_load_balancer_api.py \
   --endpoint-id ENDPOINT_ID \
   --env-file ../.env \
