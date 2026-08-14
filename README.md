@@ -74,8 +74,12 @@ return HTTP 502 with a structured error body.
 4. Select **Load Balancer** endpoint type.
 5. Start with a single 48 GB GPU such as A40 or RTX A6000. A 24 GB GPU can be
    tested later after the deployment is stable.
-6. Use `workersMin=1`, `workersMax=1`, execution timeout `1800` seconds,
-   container disk at least `64 GB`, CUDA `13.0`, and FlashBoot enabled.
+6. Use `workersMin=0`, `workersMax=1`, idle timeout `300` seconds, and execution timeout `1800` seconds,
+   container disk at least `64 GB`, CUDA `12.0` or newer, and FlashBoot enabled.
+   This endpoint scales to zero after five idle minutes, so the first request
+   must allow for the IndexTTS model download and cold start. Do not set the
+   idle timeout to only a few seconds: the scaler can terminate a cold worker
+   before this large model becomes ready.
 7. Configure the template HTTP ports as `8000/http,8001/http`.
 8. Create a RunPod Secret named `OSS_UPLOAD_API_KEY`, then configure:
 
@@ -107,13 +111,20 @@ After the endpoint is ready, run a real test without committing credentials or
 audio files:
 
 ```bash
-python scripts/live_test.py \
+python scripts/test_load_balancer_api.py \
   --endpoint-id ENDPOINT_ID \
   --env-file ../.env \
   --speaker ../fxd.m4a \
   --emotion ../emotion1.m4a \
+  --output ../index-tts25-test-output.wav \
   --text '大概两到三天就可以送到哈，收到以后您可以品鉴一下哦如果觉得好喝也可以找我，您保留好我的微信有任何问题就随时找我哦'
 ```
+
+The script prints every cold-start, OSS upload, synthesis, response, download,
+and WAV-validation stage. API keys are always printed as
+`[REDACTED_SECRET]`. With `workersMin=0`, an initial request can report no
+available workers before RunPod finishes provisioning; the script polls
+`/ready` until the worker and model are ready.
 
 ## Security and license
 
